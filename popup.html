@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Efha</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      width: 380px;
+      margin: 0;
+      padding: 0;
+      background-color: var(--background);
+      color: var(--foreground);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow-x: hidden;
+    }
+
+    .container {
+      padding: 16px;
+    }
+
+    /* Header Status Badge */
+    .status-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status-title {
+      font-size: 11px;
+      color: var(--muted-foreground);
+      font-weight: 500;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--muted-foreground);
+    }
+
+    .status-dot.active {
+      background-color: #2ed573;
+      box-shadow: 0 0 8px #2ed573;
+    }
+
+    /* Hidden File Input */
+    #file-input {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">
+        <h1>Efha</h1>
+      </div>
+      <div class="header-actions">
+        <button id="btn-toggle-theme" class="header-icon-btn" title="Ganti Tema (Light/Dark)">
+          <svg id="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+        </button>
+        <button id="btn-set-folder" class="header-icon-btn" title="Set Folder Penyimpanan">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+        <div class="status-badge">
+          <span id="status-dot" class="status-dot"></span>
+          <span id="status-text" style="font-size: 11px; color: var(--muted-foreground);">Checking...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Folder Settings Panel (In-popup collapsible) -->
+    <div id="folder-settings-panel" class="folder-settings-panel" style="display: none;">
+      <div class="panel-header">
+        <span>Folder Tujuan Download</span>
+        <button id="btn-close-folder-settings" class="close-btn">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div id="popup-custom-folder-display" style="display: none; background: var(--secondary); padding: 8px 10px; border-radius: 6px; border: 1px dashed var(--border); margin-bottom: 12px;">
+          <div style="font-size: 10px; color: var(--muted-foreground); font-weight: 700; text-transform: uppercase;">Folder Kustom Aktif</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+            <span id="popup-custom-folder-name" style="font-size: 12px; color: var(--foreground); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">-</span>
+            <button id="btn-clear-popup-custom-dir" style="background: none; border: none; color: var(--destructive); font-size: 11px; cursor: pointer; padding: 0; font-weight: bold; font-family: inherit;">Hapus</button>
+          </div>
+        </div>
+
+        <p class="helper-text" style="font-weight: bold; color: var(--foreground); margin-bottom: 6px;">💡 Tips Langsung Download (Bebas Pilih Folder):</p>
+        <p class="helper-text" style="margin-bottom: 12px; line-height: 1.4;">Untuk menyimpan ke folder kustom mana saja di komputer Anda (tanpa tanya lokasi setiap download), silakan gunakan tombol <strong>"Pilih Folder"</strong> di panel melayang Efha pada halaman Instagram.</p>
+        <p class="helper-text" style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">Atau atur nama subfolder (di dalam folder Downloads bawaan Chrome):</p>
+        <div class="input-group">
+          <input type="text" id="input-folder-path" placeholder="Contoh: Efha_Instagram" />
+          <button id="btn-save-folder" class="btn-save">Simpan</button>
+        </div>
+        <div id="folder-status-message" class="status-message"></div>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
+          <p class="helper-text" style="font-weight: bold; color: var(--foreground); margin-bottom: 6px;">Keamanan Akun (Anti-Block):</p>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer; color: var(--foreground);">
+            <input type="checkbox" id="chk-enable-mutual-badges" style="cursor: pointer;" />
+            <span>Aktifkan Badge Hubungan Mutual</span>
+          </label>
+          <p class="helper-text" style="margin-top: 4px; font-size: 9.5px; color: var(--muted-foreground); line-height: 1.3;">
+            Nonaktifkan ini jika Anda sering terblokir sementara oleh Instagram untuk membatasi request API latar belakang.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs Nav Bar -->
+    <div class="tabs-nav">
+      <button class="tab-link active" data-tab="tab-downloader">Downloader</button>
+      <button class="tab-link" data-tab="tab-tracker">Tracker</button>
+      <button class="tab-link" data-tab="tab-engagement">Engagement</button>
+      <button class="tab-link" data-tab="tab-recap">Rekap</button>
+    </div>
+
+    <!-- TAB 1: DOWNLOADER -->
+    <div id="tab-downloader" class="tab-content active">
+      <div class="section-title">Cara Menggunakan</div>
+      
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          Buka situs <strong>www.instagram.com</strong> di browsermu.
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          Buka <strong>Story</strong>, <strong>Post</strong>, atau <strong>Reels</strong> orang lain.
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          Gunakan panel melayang <strong>Download</strong> atau <strong>Copy Photo</strong> di kanan layar untuk menyimpan resolusi tertinggi!
+        </div>
+      </div>
+
+      <button id="action-btn" class="action-btn" style="margin-top: 14px;">Buka Instagram</button>
+    </div>
+
+    <!-- TAB 2: FOLLOW BACK TRACKER -->
+    <div id="tab-tracker" class="tab-content">
+      <!-- Unscanned / Control buttons row -->
+      <div class="sync-actions">
+        <button id="btn-sync-api" class="btn-primary">Pindai Data Follower</button>
+        <button id="btn-upload-json" class="btn-secondary">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+          </svg>
+          Upload JSON
+        </button>
+        <input type="file" id="file-input" accept=".json">
+      </div>
+
+      <!-- Syncing progress bar -->
+      <div id="progress-container" class="progress-container">
+        <div class="progress-header">
+          <span id="progress-status">Menghubungi API...</span>
+          <span id="progress-percent">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="progress-bar-fill" class="progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <!-- Scanned stats cards -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div id="cnt-followers" class="stat-val">-</div>
+          <div class="stat-lbl">Followers</div>
+        </div>
+        <div class="stat-card">
+          <div id="cnt-following" class="stat-val">-</div>
+          <div class="stat-lbl">Following</div>
+        </div>
+        <div class="stat-card">
+          <div id="cnt-unfollowers" class="stat-val red">-</div>
+          <div class="stat-lbl">Non-Followback</div>
+        </div>
+      </div>
+
+      <!-- Non-followers list content -->
+      <div class="tracker-list-section">
+        <div class="search-row">
+          <input type="text" id="search-input" class="search-input" placeholder="Cari non-follower...">
+        </div>
+        
+        <div class="bulk-action-bar">
+          <label class="select-all-lbl">
+            <input type="checkbox" id="chk-select-all">
+            <span>Select All</span>
+          </label>
+          <span id="chk-count-text">0 Terpilih</span>
+        </div>
+
+        <div class="list-wrapper">
+          <div id="unfollowers-list-container">
+            <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 12px;">
+              Silakan lakukan pemindaian data follower Anda terlebih dahulu.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unfollow buttons actions -->
+      <div id="unfollow-action-panel" class="unfollow-action-panel">
+        <div id="unfollow-status" class="unfollow-status-text"></div>
+        <button id="btn-batch-unfollow" class="btn-danger">Unfollow Masal Terpilih</button>
+      </div>
+    </div>
+
+    <!-- TAB 3: ENGAGEMENT -->
+    <div id="tab-engagement" class="tab-content">
+      <div class="section-title">Tren Story Paling Sering Dilihat</div>
+      <div style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 12px; line-height: 1.4;">
+        Berdasarkan histori story milik teman yang paling sering Anda tonton:
+      </div>
+      
+      <div class="engagement-list">
+        <div id="engagement-list-container">
+          <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 12px;">
+            Belum ada data story yang dilihat. Silakan mulai melihat story orang lain.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: REKAP DOWNLOAD -->
+    <div id="tab-recap" class="tab-content">
+      <div class="sync-actions" style="margin-bottom: 12px; display: flex; gap: 8px;">
+        <button id="popup-recap-export-btn" class="btn-primary" style="flex: 1; font-size: 11px; padding: 6px 8px;">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="fill: currentColor; flex-shrink: 0;"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg>
+          Export Excel
+        </button>
+        <button id="popup-recap-clear-btn" class="btn-danger" style="flex: 1; font-size: 11px; padding: 6px 8px;">
+          Hapus Rekap
+        </button>
+      </div>
+
+      <div style="font-size: 11px; color: var(--muted-foreground); margin-bottom: 10px; line-height: 1.4;">
+        Rekap jumlah file media yang berhasil terdownload:
+      </div>
+
+      <div class="list-wrapper" style="max-height: 250px; overflow-y: auto;">
+        <div id="popup-recap-list-container">
+          <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 11px;">
+            Belum ada data unduhan.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

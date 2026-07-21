@@ -1,1 +1,3 @@
-# efha-igtools-20260721-4.0.0
+# efha-igtools-1.0
+
+Instagram tools chrome extension.

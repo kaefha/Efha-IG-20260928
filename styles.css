@@ -1,0 +1,1056 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Shadcn-Studio Theme Design System for Efha Instagram Tools */
+
+:root {
+  --radius: 0.625rem;
+  /* Light Mode (Default) */
+  --background: oklch(1 0 0); /* #ffffff */
+  --foreground: oklch(0.145 0 0); /* #171717 */
+  --card: oklch(1 0 0); /* #ffffff */
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0); /* #222222 */
+  --primary-foreground: oklch(0.985 0 0); /* #fafafa */
+  --secondary: oklch(0.97 0 0); /* #f5f5f5 */
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0); /* #737373 */
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325); /* #ef4444 */
+  --border: oklch(0.922 0 0); /* #e5e5e5 */
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Legacy variables mapped to new theme variables for backward compatibility */
+  --ag-bg-dark: var(--background);
+  --ag-bg-panel: var(--background);
+  --ag-card-bg: var(--card);
+  --ag-border: var(--border);
+  --ag-border-hover: var(--ring);
+  --ag-glow: transparent;
+  --ag-accent: var(--primary);
+  --ag-accent-glow: none;
+  --ag-cyan: var(--foreground);
+  --ag-cyan-glow: none;
+  --ag-magenta: var(--destructive);
+  --ag-text-white: var(--foreground);
+  --ag-text-gray: var(--muted-foreground);
+  --ag-text-muted: var(--muted-foreground);
+  --ag-gradient: var(--primary);
+  --ag-gradient-hover: var(--foreground);
+  --ag-btn-danger: var(--destructive);
+  --ag-btn-danger-hover: var(--destructive);
+}
+
+.dark {
+  /* Dark Mode Overrides */
+  --background: oklch(0.145 0 0); /* #171717 */
+  --foreground: oklch(0.985 0 0); /* #fafafa */
+  --card: oklch(0.205 0 0); /* #222222 */
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0); /* #e5e5e5 */
+  --primary-foreground: oklch(0.205 0 0); /* #222222 */
+  --secondary: oklch(0.269 0 0); /* #2a2a2a */
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0); /* #a3a3a3 */
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216); /* #ef4444 */
+  --border: oklch(1 0 0 / 10%); /* rgba(255, 255, 255, 0.1) */
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
+/* Smooth transitions for theme toggle */
+.ig-helper-panel,
+.ig-helper-btn,
+.efha-launcher,
+#efha-dashboard-drawer,
+.folder-settings-panel,
+.tabs-nav,
+.tab-link,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.stat-card,
+.list-wrapper,
+.list-item,
+input[type="text"],
+.search-input,
+.ig-helper-panel-dir-input {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease !important;
+}
+
+/* Floating Control Panel */
+.ig-helper-panel {
+  position: fixed;
+  left: 24px;
+  top: 120px;
+  z-index: 9999999;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  width: 160px;
+  box-sizing: border-box;
+}
+
+.ig-helper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  background: var(--secondary);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  outline: none;
+  text-align: left;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.ig-helper-btn:hover {
+  background: var(--muted-foreground);
+  color: var(--primary-foreground);
+  border-color: var(--ring);
+}
+
+.ig-helper-btn:active {
+  transform: scale(0.98);
+}
+
+.ig-helper-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--border);
+  color: var(--muted-foreground);
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.ig-helper-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Specific buttons overwrite */
+#ig-helper-open-dashboard {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+#ig-helper-open-dashboard:hover {
+  background: var(--foreground) !important;
+  color: var(--background) !important;
+}
+
+/* Specific feedback states */
+.ig-helper-btn.success {
+  background: rgba(46, 213, 115, 0.15) !important;
+  color: #2ed573 !important;
+  border-color: rgba(46, 213, 115, 0.3) !important;
+}
+
+.ig-helper-btn.loading {
+  background: rgba(255, 206, 86, 0.15) !important;
+  color: #ffce56 !important;
+  border-color: rgba(255, 206, 86, 0.3) !important;
+}
+
+/* Toast Notification Styles */
+.ig-helper-toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translate(-50%, 100px);
+  background: var(--card);
+  color: var(--foreground);
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 10000000;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  pointer-events: none;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.ig-helper-toast.show {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.ig-helper-toast svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Custom modal styles for bulk story downloads */
+.ig-helper-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.ig-helper-modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ig-helper-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 320px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  transform: scale(0.9);
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  text-align: center;
+  color: var(--foreground);
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.ig-helper-modal-overlay.show .ig-helper-modal {
+  transform: scale(1);
+}
+
+.ig-helper-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--foreground);
+}
+
+.ig-helper-modal-desc {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+.ig-helper-modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ig-helper-modal-btn {
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  outline: none;
+}
+
+.ig-helper-modal-btn:hover {
+  background: var(--muted-foreground);
+  color: var(--primary-foreground);
+  border-color: var(--ring);
+}
+
+.ig-helper-modal-btn-zip {
+  background: var(--primary);
+  border: 1px solid var(--border);
+  color: var(--primary-foreground);
+}
+
+.ig-helper-modal-btn-zip:hover {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.ig-helper-modal-btn-cancel {
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin-top: 10px;
+  padding: 6px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.ig-helper-modal-btn-cancel:hover {
+  color: var(--foreground);
+}
+
+.ig-helper-mutual-status {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: calc(var(--radius) - 2px);
+  margin-bottom: 4px;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+.ig-helper-mutual-status.mutual-yes {
+  background: rgba(46, 213, 115, 0.15);
+  color: #2ed573;
+  border: 1px solid rgba(46, 213, 115, 0.25);
+}
+
+.ig-helper-mutual-status.mutual-no {
+  background: rgba(255, 71, 87, 0.12);
+  color: #ff4757;
+  border: 1px solid rgba(255, 71, 87, 0.25);
+}
+
+/* Permanent Dashboard Launcher Button */
+.efha-launcher {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 9999998;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.efha-launcher:hover {
+  transform: scale(1.05);
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.efha-launcher svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* In-Page Dashboard Drawer Overlay */
+#efha-dashboard-drawer {
+  position: fixed;
+  top: 0;
+  right: -400px;
+  width: 380px;
+  height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+  border-left: 1px solid var(--border);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  z-index: 10000000;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+#efha-dashboard-drawer.open {
+  right: 0;
+}
+
+#efha-dashboard-drawer .drawer-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+#efha-dashboard-drawer .header {
+  position: relative;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#efha-dashboard-drawer .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#efha-dashboard-drawer .logo-container {
+  width: 32px;
+  height: 32px;
+  background: var(--primary);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#efha-dashboard-drawer .logo-container svg {
+  width: 18px;
+  height: 18px;
+  fill: var(--primary-foreground);
+}
+
+#efha-dashboard-drawer h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--foreground);
+}
+
+#efha-dashboard-drawer .efha-drawer-close {
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+#efha-dashboard-drawer .efha-drawer-close:hover {
+  color: var(--foreground);
+}
+
+/* Tabs */
+.tabs-nav {
+  display: flex;
+  background: var(--secondary);
+  border-radius: var(--radius);
+  padding: 3px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+
+.tab-link {
+  flex: 1;
+  text-align: center;
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: calc(var(--radius) - 2px);
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.tab-link.active {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Sync Actions */
+.sync-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.btn-primary {
+  flex: 1.2;
+  background: var(--primary);
+  border: 1px solid var(--border);
+  color: var(--primary-foreground);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-primary:hover {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.btn-secondary {
+  flex: 1;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.2s, border-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-secondary:hover {
+  background: var(--muted);
+  border-color: var(--ring);
+}
+
+/* Progress bar */
+.progress-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 16px;
+  display: none;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 6px;
+  color: var(--muted-foreground);
+}
+
+.progress-bar-bg {
+  height: 6px;
+  background: var(--secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+
+/* Stats */
+.stats-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  text-align: center;
+}
+
+.stat-val {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.stat-val.red {
+  color: var(--destructive);
+}
+
+.stat-lbl {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+}
+
+/* Lists */
+.tracker-list-section {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 340px);
+  min-height: 250px;
+}
+
+.search-row {
+  margin-bottom: 8px;
+}
+
+.search-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--secondary);
+  border: 1px solid var(--input);
+  color: var(--foreground);
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: calc(var(--radius) - 2px);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.select-all-lbl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.list-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.list-wrapper::-webkit-scrollbar {
+  width: 4px;
+}
+
+.list-wrapper::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--secondary);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.username {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fullname {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+
+.chk-container {
+  display: flex;
+  align-items: center;
+}
+
+.unfollow-action-panel {
+  margin-top: 12px;
+  display: none;
+}
+
+.unfollow-status-text {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.btn-danger {
+  background: var(--destructive);
+  color: white;
+  border: none;
+  width: 100%;
+  padding: 10px;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.2s ease;
+}
+
+.btn-danger:hover {
+  opacity: 0.9;
+}
+
+/* Section elements */
+.section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted-foreground);
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.engagement-list {
+  max-height: calc(100vh - 250px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.engagement-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.engagement-item:last-child {
+  border-bottom: none;
+}
+
+.engagement-user {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.engagement-score {
+  background: var(--secondary);
+  color: var(--foreground);
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+
+/* Story Overlay Download Button */
+.ig-story-dl-btn {
+  background: none !important;
+  border: none !important;
+  padding: 8px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #ffffff !important;
+  opacity: 0.85 !important;
+  transition: opacity 0.2s, transform 0.2s !important;
+  vertical-align: middle !important;
+  margin-right: 4px !important;
+  outline: none !important;
+}
+
+.ig-story-dl-btn:hover {
+  opacity: 1 !important;
+  transform: scale(1.15) !important;
+  color: var(--primary) !important;
+}
+
+.ig-story-dl-btn:active {
+  transform: scale(0.9) !important;
+}
+
+.ig-story-dl-btn svg {
+  width: 20px !important;
+  height: 20px !important;
+  fill: currentColor !important;
+}
+
+.ig-story-dl-btn .spinner {
+  width: 18px !important;
+  height: 18px !important;
+  animation: rotate 2s linear infinite !important;
+  color: #ffffff !important;
+}
+
+/* Folder Settings Panel Layout inside Drawer or Popup */
+.folder-settings-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 16px;
+  box-shadow: none;
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.folder-settings-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.folder-settings-panel .panel-header .close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.folder-settings-panel .panel-header .close-btn:hover {
+  color: var(--foreground);
+}
+
+.folder-settings-panel .helper-text {
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  margin: 0 0 8px 0;
+  line-height: 1.35;
+}
+
+.folder-settings-panel .input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.folder-settings-panel input[type="text"] {
+  flex: 1;
+  background: var(--secondary);
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--foreground);
+  padding: 6px 10px;
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.folder-settings-panel input[type="text"]:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.folder-settings-panel .btn-save {
+  background: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--primary-foreground);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.2s;
+  box-shadow: none;
+}
+
+.folder-settings-panel .btn-save:hover {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.folder-settings-panel .status-message {
+  font-size: 10px;
+  margin-top: 6px;
+  color: #2ed573;
+  min-height: 14px;
+}
+
+/* Header actions wrap */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Header icon button styling */
+.header-icon-btn {
+  background: none;
+  border: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.header-icon-btn:hover {
+  color: var(--foreground);
+  transform: scale(1.05);
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
+/* Floating Panel Directory Settings */
+.ig-helper-panel-dir-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.ig-helper-panel-dir-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ig-helper-panel-dir-save {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 0 4px;
+  font-weight: bold;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+
+.ig-helper-panel-dir-save:hover {
+  opacity: 0.8;
+}
+
+.ig-helper-panel-dir-input {
+  background: var(--secondary);
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--foreground);
+  font-size: 11px;
+  padding: 5px 8px;
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ig-helper-panel-dir-input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.ig-helper-panel-dir-status {
+  font-size: 9px;
+  color: #2ed573;
+  min-height: 11px;
+  text-align: right;
+  margin-top: 1px;
+}
+
