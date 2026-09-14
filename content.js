@@ -481,6 +481,7 @@
       document.getElementById('efha-dashboard-drawer'),
       document.getElementById('ig-helper-panel'),
       document.getElementById('ig-helper-modal-overlay'),
+      document.getElementById('efha-media-modal-overlay'),
       document.querySelector('.ig-helper-toast'),
       document.getElementById('efha-floating-countdown')
     ];
@@ -501,7 +502,7 @@
     }
   }
 
-  // Create and inject the floating panel
+  // Create and inject the docked control panel (slides out from right)
   function injectControlPanel() {
     if (document.getElementById('ig-helper-panel')) return;
  
@@ -513,6 +514,11 @@
     }
  
     activePanel.innerHTML = `
+      <button id="ig-helper-panel-toggle" class="ig-helper-panel-toggle" title="Sembunyikan / Tampilkan Aksi">
+        <svg id="ig-helper-panel-toggle-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
       <div class="ig-helper-panel-dir-container">
         <div class="ig-helper-panel-dir-header">
           <span>Save Folder (Default)</span>
@@ -646,6 +652,33 @@
       const drawer = document.getElementById('efha-dashboard-drawer');
       if (drawer) {
         drawer.classList.toggle('open');
+      }
+    });
+
+    // Bind toggle handle event
+    const toggleBtn = document.getElementById('ig-helper-panel-toggle');
+    const toggleIcon = document.getElementById('ig-helper-panel-toggle-icon');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!activePanel) return;
+        const isCollapsed = activePanel.classList.toggle('collapsed');
+        if (toggleIcon) {
+          toggleIcon.innerHTML = isCollapsed
+            ? '<polyline points="15 18 9 12 15 6"></polyline>'
+            : '<polyline points="9 18 15 12 9 6"></polyline>';
+        }
+        chrome.storage.local.set({ efha_action_panel_collapsed: isCollapsed });
+      });
+    }
+
+    // Restore saved collapsed state
+    chrome.storage.local.get({ efha_action_panel_collapsed: false }, (res) => {
+      if (res.efha_action_panel_collapsed && activePanel) {
+        activePanel.classList.add('collapsed');
+        if (toggleIcon) {
+          toggleIcon.innerHTML = '<polyline points="15 18 9 12 15 6"></polyline>';
+        }
       }
     });
 
@@ -2475,7 +2508,9 @@
         if (choice === 'ZIP') {
           await downloadStoriesAsZip(reelsUser, items);
         } else if (choice === 'INDIVIDUAL') {
-          await downloadStoriesIndividually(reelsUser, items);
+          showMediaSelectionModal(reelsUser, items, async (selectedItems) => {
+            await downloadStoriesIndividually(reelsUser, selectedItems);
+          });
         }
       });
 
@@ -2536,6 +2571,249 @@
     document.getElementById('ig-helper-modal-cancel').onclick = () => {
       overlay.classList.remove('show');
     };
+  }
+
+  // Display media selection modal before downloading individual stories
+  async function showMediaSelectionModal(username, items, onConfirm) {
+    let overlay = document.getElementById('efha-media-modal-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'efha-media-modal-overlay';
+      overlay.className = 'efha-media-modal-overlay';
+      document.body.appendChild(overlay);
+    }
+
+    if (currentTheme === 'dark') {
+      overlay.classList.add('dark');
+    } else {
+      overlay.classList.remove('dark');
+    }
+
+    // Check duplicate download history to badge already downloaded items
+    const downloadHistory = (typeof getDownloadHistory === 'function') ? await getDownloadHistory() : {};
+
+    // Prepare items data (default all selected)
+    const selectedIndices = new Set(items.map((_, idx) => idx));
+    let currentFilter = 'all'; // 'all', 'photo', 'video'
+
+    const totalCount = items.length;
+    const photoCount = items.filter(it => it.media_type !== 2 && !it.is_video).length;
+    const videoCount = items.filter(it => it.media_type === 2 || it.is_video).length;
+
+    function renderModalContent() {
+      const selectedCount = selectedIndices.size;
+      
+      overlay.innerHTML = `
+        <div class="efha-media-modal">
+          <div class="efha-media-modal-header">
+            <div class="efha-media-modal-header-title">
+              <h3>Pilih Foto / Media untuk Disimpan</h3>
+              <span>@${username} &bull; ${totalCount} media ditemukan</span>
+            </div>
+            <button id="efha-media-modal-close" class="efha-media-modal-close-btn" title="Tutup">&times;</button>
+          </div>
+
+          <div class="efha-media-modal-toolbar">
+            <div class="efha-media-modal-toolbar-actions">
+              <button id="efha-btn-select-all" class="efha-toolbar-btn">Pilih Semua</button>
+              <button id="efha-btn-deselect-all" class="efha-toolbar-btn">Batalkan Semua</button>
+              <div class="efha-toolbar-filter-group">
+                <button class="efha-filter-btn ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">Semua (${totalCount})</button>
+                <button class="efha-filter-btn ${currentFilter === 'photo' ? 'active' : ''}" data-filter="photo">Foto (${photoCount})</button>
+                <button class="efha-filter-btn ${currentFilter === 'video' ? 'active' : ''}" data-filter="video">Video (${videoCount})</button>
+              </div>
+            </div>
+            <div style="font-size: 12px; font-weight: 500; color: var(--foreground);">
+              Dipilih: <span id="efha-counter-badge" style="color: #2ed573; font-weight: 700;">${selectedCount}</span> / ${totalCount}
+            </div>
+          </div>
+
+          <div class="efha-media-grid" id="efha-media-items-grid">
+            ${items.map((item, idx) => {
+              const isVideo = item.media_type === 2 || item.is_video;
+              const isDownloaded = item.pk && downloadHistory[item.pk];
+              const isSelected = selectedIndices.has(idx);
+              const isHidden = (currentFilter === 'photo' && isVideo) || (currentFilter === 'video' && !isVideo);
+              
+              // Find thumbnail URL
+              let thumbUrl = '';
+              if (item.image_versions2 && item.image_versions2.candidates && item.image_versions2.candidates.length > 0) {
+                const candidates = item.image_versions2.candidates;
+                const sorted = [...candidates].sort((a, b) => a.width - b.width);
+                const suitable = sorted.find(c => c.width >= 240) || sorted[sorted.length - 1];
+                thumbUrl = suitable.url;
+              } else {
+                thumbUrl = getHighestResolutionUrl(item) || '';
+              }
+
+              // Format date/time
+              let timeText = '';
+              if (item.taken_at) {
+                const date = new Date(item.taken_at * 1000);
+                const hours = String(date.getHours()).padStart(2, '0');
+                const mins = String(date.getMinutes()).padStart(2, '0');
+                timeText = `${hours}:${mins}`;
+              }
+
+              return `
+                <div class="efha-media-card ${isSelected ? 'selected' : ''}" data-idx="${idx}" style="${isHidden ? 'display: none;' : ''}">
+                  <div class="efha-media-card-type-badge">
+                    ${isVideo 
+                      ? '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> <span>Video</span>' 
+                      : '<svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg> <span>Foto</span>'
+                    }
+                  </div>
+                  <div class="efha-media-card-check">
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <img src="${thumbUrl}" alt="Story #${idx + 1}" loading="lazy" />
+                  ${isDownloaded ? '<div class="efha-media-card-downloaded-badge">Tersimpan</div>' : ''}
+                  <div class="efha-media-card-info">
+                    <span style="font-weight: 600;">#${idx + 1}</span>
+                    <span>${timeText}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="efha-media-modal-footer">
+            <div class="efha-media-modal-status-text">
+              Hanya media yang dicentang yang akan disimpan ke komputer.
+            </div>
+            <div class="efha-media-modal-footer-actions">
+              <button id="efha-media-btn-cancel" class="efha-media-btn-cancel">Batal</button>
+              <button id="efha-media-btn-save" class="efha-media-btn-save" ${selectedCount === 0 ? 'disabled' : ''}>
+                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                <span>Simpan (${selectedCount} File)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      attachEventListeners();
+    }
+
+    function updateCardState(idx) {
+      const card = overlay.querySelector(`.efha-media-card[data-idx="${idx}"]`);
+      if (card) {
+        if (selectedIndices.has(idx)) {
+          card.classList.add('selected');
+        } else {
+          card.classList.remove('selected');
+        }
+      }
+      updateCounters();
+    }
+
+    function updateCounters() {
+      const selectedCount = selectedIndices.size;
+      const counterBadge = document.getElementById('efha-counter-badge');
+      if (counterBadge) counterBadge.innerText = selectedCount;
+
+      const saveBtn = document.getElementById('efha-media-btn-save');
+      if (saveBtn) {
+        saveBtn.disabled = selectedCount === 0;
+        const textSpan = saveBtn.querySelector('span');
+        if (textSpan) textSpan.innerText = `Simpan (${selectedCount} File)`;
+      }
+    }
+
+    function attachEventListeners() {
+      // Close button
+      const closeBtn = document.getElementById('efha-media-modal-close');
+      if (closeBtn) {
+        closeBtn.onclick = () => overlay.classList.remove('show');
+      }
+
+      // Cancel button
+      const cancelBtn = document.getElementById('efha-media-btn-cancel');
+      if (cancelBtn) {
+        cancelBtn.onclick = () => overlay.classList.remove('show');
+      }
+
+      // Close on backdrop click
+      overlay.onclick = (e) => {
+        if (e.target === overlay) {
+          overlay.classList.remove('show');
+        }
+      };
+
+      // Card click handlers
+      const cards = overlay.querySelectorAll('.efha-media-card');
+      cards.forEach(card => {
+        card.onclick = () => {
+          const idx = parseInt(card.getAttribute('data-idx'), 10);
+          if (selectedIndices.has(idx)) {
+            selectedIndices.delete(idx);
+          } else {
+            selectedIndices.add(idx);
+          }
+          updateCardState(idx);
+        };
+      });
+
+      // Select All
+      const selectAllBtn = document.getElementById('efha-btn-select-all');
+      if (selectAllBtn) {
+        selectAllBtn.onclick = () => {
+          items.forEach((item, idx) => {
+            const isVideo = item.media_type === 2 || item.is_video;
+            const isVisible = !( (currentFilter === 'photo' && isVideo) || (currentFilter === 'video' && !isVideo) );
+            if (isVisible) {
+              selectedIndices.add(idx);
+            }
+          });
+          items.forEach((_, idx) => updateCardState(idx));
+        };
+      }
+
+      // Deselect All
+      const deselectAllBtn = document.getElementById('efha-btn-deselect-all');
+      if (deselectAllBtn) {
+        deselectAllBtn.onclick = () => {
+          items.forEach((item, idx) => {
+            const isVideo = item.media_type === 2 || item.is_video;
+            const isVisible = !( (currentFilter === 'photo' && isVideo) || (currentFilter === 'video' && !isVideo) );
+            if (isVisible) {
+              selectedIndices.delete(idx);
+            }
+          });
+          items.forEach((_, idx) => updateCardState(idx));
+        };
+      }
+
+      // Filter tabs
+      const filterBtns = overlay.querySelectorAll('.efha-filter-btn');
+      filterBtns.forEach(btn => {
+        btn.onclick = () => {
+          currentFilter = btn.getAttribute('data-filter');
+          filterBtns.forEach(b => b.classList.toggle('active', b === btn));
+          cards.forEach(card => {
+            const idx = parseInt(card.getAttribute('data-idx'), 10);
+            const item = items[idx];
+            const isVideo = item.media_type === 2 || item.is_video;
+            const isHidden = (currentFilter === 'photo' && isVideo) || (currentFilter === 'video' && !isVideo);
+            card.style.display = isHidden ? 'none' : '';
+          });
+        };
+      });
+
+      // Save button
+      const saveBtn = document.getElementById('efha-media-btn-save');
+      if (saveBtn) {
+        saveBtn.onclick = () => {
+          if (selectedIndices.size === 0) return;
+          const selectedItems = items.filter((_, idx) => selectedIndices.has(idx));
+          overlay.classList.remove('show');
+          onConfirm(selectedItems);
+        };
+      }
+    }
+
+    renderModalContent();
+    overlay.classList.add('show');
   }
 
   // Helper to fetch media blob directly or fallback to background base64 fetch
