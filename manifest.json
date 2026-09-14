@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Efha",
-  "version": "1.0.0",
-  "version_name": "2026 07 21 1.0.0",
+  "version": "1.0",
+  "version_name": "2026 09 14 1.0",
   "description": "Download Instagram Stories in high quality and copy stories directly to your clipboard.",
   "permissions": [
     "downloads",
