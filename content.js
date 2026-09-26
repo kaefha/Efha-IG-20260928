@@ -24,6 +24,32 @@
   // Cached www-claim value (updated by MAIN world inject.js interceptor)
   let cachedWwwClaim = '';
 
+  // Fast in-memory caches for instant resolving (< 50ms)
+  const efhaReelsCache = new Map(); // username/userId/highlight:id -> reel object
+  const efhaUserCache = new Map();  // username.toLowerCase() -> user object
+
+  // Listen for live reels & user profile data intercepted from Instagram's network requests
+  document.addEventListener('efha-reels-data', (e) => {
+    const reels = e.detail;
+    if (!reels || typeof reels !== 'object') return;
+    for (const [key, reel] of Object.entries(reels)) {
+      if (!reel) continue;
+      efhaReelsCache.set(String(key), reel);
+      if (reel.user && reel.user.username) {
+        const u = reel.user.username.toLowerCase();
+        efhaReelsCache.set(u, reel);
+        efhaUserCache.set(u, reel.user);
+      }
+    }
+  });
+
+  document.addEventListener('efha-user-data', (e) => {
+    const user = e.detail;
+    if (user && user.username) {
+      efhaUserCache.set(user.username.toLowerCase(), user);
+    }
+  });
+
   // Theme Management variables
   let currentTheme = 'light';
   const SUN_ICON = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
@@ -204,7 +230,7 @@
     
     if (entries.length === 0) {
       containerElement.innerHTML = `
-        <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 11px;">
+        <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 12px;">
           Belum ada data unduhan. Silakan unduh foto/video terlebih dahulu.
         </div>
       `;
@@ -212,14 +238,15 @@
     }
 
     containerElement.innerHTML = '';
-    entries.forEach(([username, count]) => {
+    entries.forEach(([username, count], idx) => {
+      const isLast = idx === entries.length - 1;
       const item = document.createElement('div');
       item.className = 'recap-item';
-      item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--secondary); border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); margin-bottom: 6px;';
+      item.style.cssText = `display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: transparent; ${isLast ? '' : 'border-bottom: 1px solid var(--border);'}`;
       
       item.innerHTML = `
-        <span class="recap-username" style="font-weight: 600; color: var(--foreground); font-size: 11px;">@${username}</span>
-        <span class="recap-badge" style="background: var(--card); color: var(--foreground); border: 1px solid var(--border); font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 12px;">${count} File</span>
+        <span class="recap-username" style="font-weight: 600; color: var(--foreground); font-size: 12px;">@${username}</span>
+        <span class="recap-badge" style="background: var(--secondary); color: var(--foreground); font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 12px;">${count} File</span>
       `;
       containerElement.appendChild(item);
     });
@@ -482,6 +509,7 @@
       document.getElementById('ig-helper-panel'),
       document.getElementById('ig-helper-modal-overlay'),
       document.getElementById('efha-media-modal-overlay'),
+      document.getElementById('efha-media-lightbox'),
       document.querySelector('.ig-helper-toast'),
       document.getElementById('efha-floating-countdown')
     ];
@@ -961,15 +989,53 @@
     } catch (e) { /* ignore */ }
   }
 
+  // Direct scan of current page embedded JSON scripts for user ID (0 network requests, ~2ms)
+  function findUserFromDomScripts(username) {
+    if (!username) return null;
+    try {
+      const scripts = document.querySelectorAll('script[type="application/json"]');
+      for (const script of scripts) {
+        const txt = script.textContent;
+        if (!txt || !txt.includes(username)) continue;
+        try {
+          const parsed = JSON.parse(txt);
+          const found = deepFindUser(parsed, username);
+          if (found && (found.id || found.pk)) {
+            return found;
+          }
+        } catch (e) {}
+      }
+    } catch (e) {}
+    return null;
+  }
+
   // Web API Calls
   async function fetchUserProfileInfo(username) {
+    if (!username) return null;
+    const lowerUser = username.toLowerCase();
+
+    // Fast path 1: In-memory cache check (instant 0ms)
+    if (efhaUserCache.has(lowerUser)) {
+      return efhaUserCache.get(lowerUser);
+    }
+
+    // Fast path 2: Direct scan of current page embedded JSON scripts (0 network requests, ~2ms)
+    const domUser = findUserFromDomScripts(username);
+    if (domUser) {
+      efhaUserCache.set(lowerUser, domUser);
+      return domUser;
+    }
+
     trackApiCall();
     const claim = getWwwClaim();
 
-    // Attempt 1: Primary web_profile_info endpoint
+    // Attempt 1: Primary web_profile_info endpoint with 3.5s timeout
     try {
       const url = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const response = await fetch(url, {
+        signal: controller.signal,
         headers: {
           'x-csrftoken': getCookieValue('csrftoken') || '',
           'x-ig-app-id': '936619743392459',
@@ -978,55 +1044,36 @@
         },
         credentials: 'include'
       });
+      clearTimeout(timeoutId);
       captureClaimFromResponse(response);
       checkResponseStatus(response, 'general');
       if (response.ok) {
         const json = await response.json();
-        if (json?.data?.user) return json.data.user;
+        if (json?.data?.user) {
+          efhaUserCache.set(lowerUser, json.data.user);
+          return json.data.user;
+        }
       }
       console.warn(`web_profile_info returned ${response.status} for ${username}, trying fallbacks...`);
     } catch (err) {
       console.warn('Primary profile fetch error:', err.message);
     }
 
-    // Attempt 2: /?__a=1&__d=dis endpoint (different from attempt 1)
-    try {
-      const fallbackUrl = `https://www.instagram.com/${username}/?__a=1&__d=dis`;
-      const response2 = await fetch(fallbackUrl, {
-        headers: {
-          'x-ig-app-id': '936619743392459',
-          'x-requested-with': 'XMLHttpRequest'
-        },
-        credentials: 'include'
+    // Attempt 2: GraphQL username lookup (fast parallel check)
+    const gqlDocIds = ['8845758582119845', '9496129080480496', '7842322082460904', '17991953975672886'];
+    const fetchDoc = async (docId) => {
+      const gqlUrl = 'https://www.instagram.com/graphql/query/';
+      const body = new URLSearchParams({
+        fb_api_caller_class: 'RelayModern',
+        fb_api_req_friendly_name: 'PolarisProfilePageContentQuery',
+        doc_id: docId,
+        variables: JSON.stringify({ username: username, render_surface: 'PROFILE' })
       });
-      captureClaimFromResponse(response2);
-      if (response2.ok) {
-        const json2 = await response2.json();
-        // This endpoint returns { graphql: { user: ... } } or { items: [...] }
-        const user = json2?.graphql?.user || json2?.data?.user;
-        if (user) return user;
-      }
-    } catch (e) {
-      console.warn('Fallback /?__a=1&__d=dis (attempt 2) failed:', e.message);
-    }
-
-    // Attempt 3: GraphQL username lookup (try multiple doc_ids since they rotate)
-    const gqlDocIds = [
-      '7842322082460904',
-      '8845758582119845',
-      '9496129080480496',
-      '17991953975672886'
-    ];
-    for (const docId of gqlDocIds) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       try {
-        const gqlUrl = 'https://www.instagram.com/graphql/query/';
-        const body = new URLSearchParams({
-          fb_api_caller_class: 'RelayModern',
-          fb_api_req_friendly_name: 'PolarisProfilePageContentQuery',
-          doc_id: docId,
-          variables: JSON.stringify({ username: username, render_surface: 'PROFILE' })
-        });
         const gqlResponse = await fetch(gqlUrl, {
+          signal: controller.signal,
           method: 'POST',
           headers: {
             'content-type': 'application/x-www-form-urlencoded',
@@ -1038,6 +1085,7 @@
           body: body.toString(),
           credentials: 'include'
         });
+        clearTimeout(timeoutId);
         captureClaimFromResponse(gqlResponse);
         if (gqlResponse.ok) {
           const gqlJson = await gqlResponse.json();
@@ -1047,15 +1095,28 @@
           if (user && (user.id || user.pk)) return user;
         }
       } catch (e) {
-        console.warn(`GraphQL doc_id ${docId} failed:`, e.message);
+        clearTimeout(timeoutId);
       }
-    }
+      return null;
+    };
 
-    // Attempt 4: Scrape the profile page HTML for embedded user data
     try {
+      const gqlResult = await Promise.any(gqlDocIds.map(id => fetchDoc(id).then(res => res || Promise.reject())));
+      if (gqlResult) {
+        efhaUserCache.set(lowerUser, gqlResult);
+        return gqlResult;
+      }
+    } catch (e) {}
+
+    // Attempt 3: Scrape the profile page HTML for embedded user data
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
       const pageResp = await fetch(`https://www.instagram.com/${username}/`, {
+        signal: controller.signal,
         credentials: 'include'
       });
+      clearTimeout(timeoutId);
       if (pageResp.ok) {
         const html = await pageResp.text();
 
@@ -1065,7 +1126,10 @@
           try {
             const sharedData = JSON.parse(sharedDataMatch[1]);
             const profileUser = sharedData?.entry_data?.ProfilePage?.[0]?.graphql?.user;
-            if (profileUser) return profileUser;
+            if (profileUser) {
+              efhaUserCache.set(lowerUser, profileUser);
+              return profileUser;
+            }
           } catch (e) { /* parse error, continue */ }
         }
 
@@ -1075,7 +1139,10 @@
           try {
             const addData = JSON.parse(additionalDataMatch[1]);
             const user = addData?.graphql?.user || addData?.user;
-            if (user) return user;
+            if (user) {
+              efhaUserCache.set(lowerUser, user);
+              return user;
+            }
           } catch (e) { /* parse error, continue */ }
         }
 
@@ -1086,18 +1153,23 @@
           try {
             const parsed = JSON.parse(jsonContent);
             const foundUser = deepFindUser(parsed, username);
-            if (foundUser) return foundUser;
+            if (foundUser) {
+              efhaUserCache.set(lowerUser, foundUser);
+              return foundUser;
+            }
           } catch (e) { /* not valid JSON or parse error */ }
         }
 
         // Final: try to find a user ID pattern in raw HTML
         const userIdMatch = html.match(/"profilePage_(\d+)"/) || html.match(/"user_id"\s*:\s*"(\d+)"/) || html.match(/"pk"\s*:\s*"?(\d+)"?/);
         if (userIdMatch) {
-          return { id: userIdMatch[1], pk: userIdMatch[1], username: username };
+          const userObj = { id: userIdMatch[1], pk: userIdMatch[1], username: username };
+          efhaUserCache.set(lowerUser, userObj);
+          return userObj;
         }
       }
     } catch (e) {
-      console.warn('HTML scrape profile fetch (attempt 4) failed:', e.message);
+      console.warn('HTML scrape profile fetch (attempt 3) failed:', e.message);
     }
 
     throw new Error(`Profile fetch failed: semua metode gagal untuk @${username}`);
@@ -1146,43 +1218,82 @@
   }
 
   async function fetchUserStories(userId) {
+    const key = String(userId);
+    if (efhaReelsCache.has(key)) {
+      return efhaReelsCache.get(key);
+    }
     trackApiCall();
     const url = `https://www.instagram.com/api/v1/feed/reels_media/?reel_ids=${userId}`;
-    const response = await fetch(url, {
-      headers: {
-        'x-csrftoken': getCookieValue('csrftoken') || '',
-        'x-ig-app-id': '936619743392459',
-        'x-ig-www-claim': getWwwClaim(),
-        'x-requested-with': 'XMLHttpRequest'
-      },
-      credentials: 'include'
-    });
-    checkResponseStatus(response, 'download');
-    if (!response.ok) {
-      throw new Error(`Stories fetch failed: ${response.status}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'x-csrftoken': getCookieValue('csrftoken') || '',
+          'x-ig-app-id': '936619743392459',
+          'x-ig-www-claim': getWwwClaim(),
+          'x-requested-with': 'XMLHttpRequest'
+        },
+        credentials: 'include'
+      });
+      clearTimeout(timeoutId);
+      checkResponseStatus(response, 'download');
+      if (!response.ok) {
+        throw new Error(`Stories fetch failed: ${response.status}`);
+      }
+      const json = await response.json();
+      const reel = json.reels?.[userId];
+      if (reel) {
+        efhaReelsCache.set(key, reel);
+        if (reel.user?.username) {
+          const lower = reel.user.username.toLowerCase();
+          efhaReelsCache.set(lower, reel);
+          efhaUserCache.set(lower, reel.user);
+        }
+      }
+      return reel;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
     }
-    const json = await response.json();
-    return json.reels[userId];
   }
 
   async function fetchHighlightStories(highlightId) {
+    const key = `highlight:${highlightId}`;
+    if (efhaReelsCache.has(key)) {
+      return efhaReelsCache.get(key);
+    }
     trackApiCall();
     const url = `https://www.instagram.com/api/v1/feed/reels_media/?reel_ids=highlight:${highlightId}`;
-    const response = await fetch(url, {
-      headers: {
-        'x-csrftoken': getCookieValue('csrftoken') || '',
-        'x-ig-app-id': '936619743392459',
-        'x-ig-www-claim': getWwwClaim(),
-        'x-requested-with': 'XMLHttpRequest'
-      },
-      credentials: 'include'
-    });
-    checkResponseStatus(response, 'download');
-    if (!response.ok) {
-      throw new Error(`Highlight fetch failed: ${response.status}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'x-csrftoken': getCookieValue('csrftoken') || '',
+          'x-ig-app-id': '936619743392459',
+          'x-ig-www-claim': getWwwClaim(),
+          'x-requested-with': 'XMLHttpRequest'
+        },
+        credentials: 'include'
+      });
+      clearTimeout(timeoutId);
+      checkResponseStatus(response, 'download');
+      if (!response.ok) {
+        throw new Error(`Highlight fetch failed: ${response.status}`);
+      }
+      const json = await response.json();
+      const reel = json.reels?.[`highlight:${highlightId}`];
+      if (reel) {
+        efhaReelsCache.set(key, reel);
+      }
+      return reel;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
     }
-    const json = await response.json();
-    return json.reels[`highlight:${highlightId}`];
   }
 
   async function fetchMediaInfo(postId) {
@@ -1825,45 +1936,15 @@
         items = [mediaItem];
       }
 
-      // Check for duplicates
-      const downloadHistory = await getDownloadHistory();
-      let duplicatesCount = 0;
-      for (let i = 0; i < items.length; i++) {
-        const slideKey = `${shortcode}_slide${i}`;
-        if (downloadHistory[slideKey]) {
-          duplicatesCount++;
-        }
-      }
-
-      if (duplicatesCount > 0) {
-        const proceed = confirm(`Terdapat ${duplicatesCount} slide yang sudah pernah diunduh. Apakah Anda ingin mengunduhnya kembali?`);
-        if (!proceed) {
-          btn.classList.remove('loading');
-          btn.innerHTML = originalHTML;
-          return;
-        }
-      }
-
       const ownerUsername = mediaItem.user ? mediaItem.user.username : (mediaItem.owner ? mediaItem.owner.username : 'instagram');
-      showToast(`Downloading ${items.length} files...`, 'info');
+      btn.classList.remove('loading');
+      btn.innerHTML = originalHTML;
 
-      let triggerCount = 0;
-      for (let i = 0; i < items.length; i++) {
-        const targetItem = items[i];
-        let url = null;
-        let isVideo = false;
-
-        if (fallbackUsed) {
-          url = getHighestResolutionUrlFromGraphQL(targetItem);
-          isVideo = targetItem.is_video;
-        } else {
-          url = getHighestResolutionUrl(targetItem);
-          isVideo = targetItem.media_type === 2;
-        }
-
-        if (!url) continue;
-
-        // Use the parent post upload timestamp; individual carousel items may also have taken_at
+      if (items.length <= 1) {
+        // Single slide fallback: trigger standard download
+        const targetItem = items[0];
+        const url = fallbackUsed ? getHighestResolutionUrlFromGraphQL(targetItem) : getHighestResolutionUrl(targetItem);
+        const isVideo = fallbackUsed ? targetItem.is_video : (targetItem.media_type === 2);
         const takenAtRaw = fallbackUsed ? (mediaItem.taken_at_timestamp || mediaItem.taken_at) : mediaItem.taken_at;
         const takenAt = takenAtRaw ? new Date(takenAtRaw * 1000) : new Date();
         const day = String(takenAt.getDate()).padStart(2, '0');
@@ -1872,30 +1953,75 @@
         const hours = String(takenAt.getHours()).padStart(2, '0');
         const minutes = String(takenAt.getMinutes()).padStart(2, '0');
         const seconds = String(takenAt.getSeconds()).padStart(2, '0');
-        const milliseconds = String(Math.floor(takenAt.getMilliseconds() / 10)).padStart(2, '0');
-
-        const dateStr = `${day} ${month} ${year}`;
-        // We offset milliseconds with index to ensure uniqueness and preserve slide order
-        const timeStr = `${hours} ${minutes} ${seconds} ${String(Math.floor(takenAt.getMilliseconds() / 10) + i).padStart(2, '0')}`;
-
         const ext = isVideo ? 'mp4' : 'jpg';
-        const filename = `${ownerUsername}_${dateStr}_${timeStr}_slide${i + 1}.${ext}`;
-
-        const slideKey = `${shortcode}_slide${i}`;
-        executeDownload(url, filename, (response) => {
-          if (response && response.success) {
-            markMediaAsDownloaded(slideKey);
+        const filename = `${ownerUsername}_${day} ${month} ${year}_${hours} ${minutes} ${seconds}_slide1.${ext}`;
+        executeDownload(url, filename, (res) => {
+          if (res && res.success) {
+            showToast('Download slide selesai!', 'success');
           }
         }, ownerUsername);
-        triggerCount++;
-
-        // small delay between slides to prevent browser queue choke
-        await new Promise(r => setTimeout(r, 150));
+        return;
       }
 
-      btn.classList.remove('loading');
-      btn.innerHTML = originalHTML;
-      showToast(`Successfully downloaded ${triggerCount} items!`, 'success');
+      // Multiple slides: Open rich media selection modal
+      showMediaSelectionModal(ownerUsername, items, async (selectedItems) => {
+        showToast(`Mengunduh ${selectedItems.length} slide...`, 'info');
+        btn.classList.add('loading');
+        let triggerCount = 0;
+
+        for (let i = 0; i < selectedItems.length; i++) {
+          const targetItem = selectedItems[i];
+          const origIdx = items.indexOf(targetItem);
+          let url = null;
+          let isVideo = false;
+
+          if (fallbackUsed) {
+            url = getHighestResolutionUrlFromGraphQL(targetItem);
+            isVideo = targetItem.is_video;
+          } else {
+            url = getHighestResolutionUrl(targetItem);
+            isVideo = targetItem.media_type === 2;
+          }
+
+          if (!url) continue;
+
+          const takenAtRaw = fallbackUsed ? (mediaItem.taken_at_timestamp || mediaItem.taken_at) : mediaItem.taken_at;
+          const takenAt = takenAtRaw ? new Date(takenAtRaw * 1000) : new Date();
+          const day = String(takenAt.getDate()).padStart(2, '0');
+          const month = String(takenAt.getMonth() + 1).padStart(2, '0');
+          const year = takenAt.getFullYear();
+          const hours = String(takenAt.getHours()).padStart(2, '0');
+          const minutes = String(takenAt.getMinutes()).padStart(2, '0');
+          const seconds = String(takenAt.getSeconds()).padStart(2, '0');
+
+          const dateStr = `${day} ${month} ${year}`;
+          const timeStr = `${hours} ${minutes} ${seconds} ${String(Math.floor(takenAt.getMilliseconds() / 10) + i).padStart(2, '0')}`;
+
+          const ext = isVideo ? 'mp4' : 'jpg';
+          const slideNum = origIdx >= 0 ? origIdx + 1 : i + 1;
+          const filename = `${ownerUsername}_${dateStr}_${timeStr}_slide${slideNum}.${ext}`;
+
+          const slideKey = `${shortcode}_slide${slideNum - 1}`;
+          executeDownload(url, filename, (response) => {
+            if (response && response.success) {
+              markMediaAsDownloaded(slideKey);
+            }
+          }, ownerUsername);
+          triggerCount++;
+
+          // small delay between slides to prevent browser queue choke
+          await new Promise(r => setTimeout(r, 150));
+        }
+
+        btn.classList.remove('loading');
+        btn.innerHTML = originalHTML;
+        showToast(`Berhasil mengunduh ${triggerCount} item!`, 'success');
+      }, {
+        title: 'Pilih Slide Carousel untuk Disimpan',
+        subtitle: `@${ownerUsername} &bull; ${items.length} slide ditemukan`,
+        isCarousel: true,
+        shortcode: shortcode
+      });
 
     } catch (e) {
       console.error('Carousel download failed:', e);
@@ -2039,10 +2165,16 @@
           takenAt: activeItem.taken_at ? new Date(activeItem.taken_at * 1000) : null
         };
       } else {
-        const user = await fetchUserProfileInfo(username);
-        if (!user) throw new Error('Instagram profile not found');
+        const lowerUser = username.toLowerCase();
+        let reelsData = efhaReelsCache.get(lowerUser);
+
+        if (!reelsData) {
+          const user = await fetchUserProfileInfo(username);
+          if (!user) throw new Error('Instagram profile not found');
+          const userId = user.id || user.pk;
+          reelsData = efhaReelsCache.get(String(userId)) || await fetchUserStories(userId);
+        }
         
-        const reelsData = await fetchUserStories(user.id);
         if (!reelsData || !reelsData.items) throw new Error('User stories not found');
         
         const items = reelsData.items;
@@ -2483,14 +2615,21 @@
 
       if (username === 'highlights') {
         const highlightId = storyId;
-        const reelsData = await fetchHighlightStories(highlightId);
+        const reelsData = efhaReelsCache.get(`highlight:${highlightId}`) || await fetchHighlightStories(highlightId);
         if (!reelsData || !reelsData.items) throw new Error('Highlight stories not found');
         items = reelsData.items;
         reelsUser = reelsData.user ? reelsData.user.username : 'instagram';
       } else {
-        const user = await fetchUserProfileInfo(username);
-        if (!user) throw new Error('Instagram profile not found');
-        const reelsData = await fetchUserStories(user.id);
+        const lowerUser = username.toLowerCase();
+        let reelsData = efhaReelsCache.get(lowerUser);
+
+        if (!reelsData) {
+          const user = await fetchUserProfileInfo(username);
+          if (!user) throw new Error('Instagram profile not found');
+          const userId = user.id || user.pk;
+          reelsData = efhaReelsCache.get(String(userId)) || await fetchUserStories(userId);
+        }
+
         if (!reelsData || !reelsData.items) throw new Error('User stories not found');
         items = reelsData.items;
         reelsUser = username;
@@ -2573,8 +2712,86 @@
     };
   }
 
-  // Display media selection modal before downloading individual stories
-  async function showMediaSelectionModal(username, items, onConfirm) {
+  // Helper to extract resolved metadata from a media item (supports story & carousel media)
+  function resolveItemMetadata(item, idx) {
+    const isVideo = Boolean(
+      item.media_type === 2 || 
+      item.is_video || 
+      (item.video_versions && item.video_versions.length > 0) || 
+      item.video_url
+    );
+
+    // 1. Thumbnail URL (highest quality suitable for preview)
+    let thumbUrl = '';
+    if (item.image_versions2 && item.image_versions2.candidates && item.image_versions2.candidates.length > 0) {
+      const candidates = item.image_versions2.candidates;
+      const sorted = [...candidates].sort((a, b) => a.width - b.width);
+      const suitable = sorted.find(c => c.width >= 360) || sorted[sorted.length - 1];
+      thumbUrl = suitable.url;
+    } else if (item.display_resources && item.display_resources.length > 0) {
+      const sorted = [...item.display_resources].sort((a, b) => a.config_width - b.config_width);
+      const suitable = sorted.find(c => c.config_width >= 360) || sorted[sorted.length - 1];
+      thumbUrl = suitable.src;
+    } else if (item.display_url) {
+      thumbUrl = item.display_url;
+    }
+
+    // 2. High-res Full Media URL for Lightbox and Download
+    let fullUrl = '';
+    if (isVideo) {
+      if (item.video_versions && item.video_versions.length > 0) {
+        const sorted = [...item.video_versions].sort((a, b) => b.width - a.width);
+        fullUrl = sorted[0].url;
+      } else if (item.video_url) {
+        fullUrl = item.video_url;
+      } else {
+        fullUrl = getHighestResolutionUrl(item) || '';
+      }
+    } else {
+      if (item.display_resources && item.display_resources.length > 0) {
+        fullUrl = getHighestResolutionUrlFromGraphQL(item) || item.display_url;
+      } else {
+        fullUrl = getHighestResolutionUrl(item) || item.display_url || '';
+      }
+    }
+
+    if (!thumbUrl && !isVideo) {
+      thumbUrl = fullUrl;
+    }
+
+    // 3. Duration text if video
+    let durationText = '';
+    if (item.video_duration) {
+      const totalSecs = Math.round(item.video_duration);
+      const mins = Math.floor(totalSecs / 60);
+      const secs = totalSecs % 60;
+      durationText = `${mins}:${String(secs).padStart(2, '0')}`;
+    }
+
+    // 4. Time text
+    let timeText = '';
+    const timestamp = item.taken_at || item.taken_at_timestamp;
+    if (timestamp) {
+      const date = new Date(timestamp * 1000);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const mins = String(date.getMinutes()).padStart(2, '0');
+      timeText = `${hours}:${mins}`;
+    }
+
+    const pk = item.pk || item.id || `item_${idx}`;
+
+    return {
+      isVideo,
+      thumbUrl,
+      fullUrl,
+      durationText,
+      timeText,
+      pk
+    };
+  }
+
+  // Display media selection modal before downloading individual stories or carousel slides
+  async function showMediaSelectionModal(username, items, onConfirm, options = {}) {
     let overlay = document.getElementById('efha-media-modal-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -2583,22 +2800,49 @@
       document.body.appendChild(overlay);
     }
 
+    // Lightbox container
+    let lightboxOverlay = document.getElementById('efha-media-lightbox');
+    if (!lightboxOverlay) {
+      lightboxOverlay = document.createElement('div');
+      lightboxOverlay.id = 'efha-media-lightbox';
+      lightboxOverlay.className = 'efha-media-lightbox';
+      document.body.appendChild(lightboxOverlay);
+    }
+
     if (currentTheme === 'dark') {
       overlay.classList.add('dark');
+      lightboxOverlay.classList.add('dark');
     } else {
       overlay.classList.remove('dark');
+      lightboxOverlay.classList.remove('dark');
     }
 
     // Check duplicate download history to badge already downloaded items
     const downloadHistory = (typeof getDownloadHistory === 'function') ? await getDownloadHistory() : {};
 
-    // Prepare items data (default all selected)
+    // Prepare items metadata
+    const resolvedItems = items.map((it, idx) => resolveItemMetadata(it, idx));
     const selectedIndices = new Set(items.map((_, idx) => idx));
     let currentFilter = 'all'; // 'all', 'photo', 'video'
+    let currentDensity = 'normal'; // 'compact', 'normal', 'large'
+    let currentLightboxIdx = 0;
+    let lightboxKeyHandler = null;
 
     const totalCount = items.length;
-    const photoCount = items.filter(it => it.media_type !== 2 && !it.is_video).length;
-    const videoCount = items.filter(it => it.media_type === 2 || it.is_video).length;
+    const photoCount = resolvedItems.filter(it => !it.isVideo).length;
+    const videoCount = resolvedItems.filter(it => it.isVideo).length;
+
+    const modalTitle = options.title || 'Pilih Foto / Media untuk Disimpan';
+    const itemLabel = options.isCarousel ? 'Slide' : 'Story';
+    const modalSubtitle = options.subtitle || `@${username} &bull; ${totalCount} ${options.isCarousel ? 'slide' : 'media'} ditemukan`;
+
+    // Load saved density preference
+    try {
+      const stored = await new Promise(res => chrome.storage.local.get({ efha_media_grid_density: 'normal' }, res));
+      if (stored && stored.efha_media_grid_density) {
+        currentDensity = stored.efha_media_grid_density;
+      }
+    } catch (e) {}
 
     function renderModalContent() {
       const selectedCount = selectedIndices.size;
@@ -2607,8 +2851,8 @@
         <div class="efha-media-modal">
           <div class="efha-media-modal-header">
             <div class="efha-media-modal-header-title">
-              <h3>Pilih Foto / Media untuk Disimpan</h3>
-              <span>@${username} &bull; ${totalCount} media ditemukan</span>
+              <h3>${modalTitle}</h3>
+              <span>${modalSubtitle}</span>
             </div>
             <button id="efha-media-modal-close" class="efha-media-modal-close-btn" title="Tutup">&times;</button>
           </div>
@@ -2623,63 +2867,80 @@
                 <button class="efha-filter-btn ${currentFilter === 'video' ? 'active' : ''}" data-filter="video">Video (${videoCount})</button>
               </div>
             </div>
-            <div style="font-size: 12px; font-weight: 500; color: var(--foreground);">
-              Dipilih: <span id="efha-counter-badge" style="color: #2ed573; font-weight: 700;">${selectedCount}</span> / ${totalCount}
+            <div class="efha-toolbar-right">
+              <div class="efha-density-group" title="Ubah Ukuran Tampilan Grid">
+                <button class="efha-density-btn ${currentDensity === 'compact' ? 'active' : ''}" data-density="compact" title="Ukuran Rapat (Compact)">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                  <span>Rapat</span>
+                </button>
+                <button class="efha-density-btn ${currentDensity === 'normal' ? 'active' : ''}" data-density="normal" title="Ukuran Sedang (Default)">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+                  <span>Sedang</span>
+                </button>
+                <button class="efha-density-btn ${currentDensity === 'large' ? 'active' : ''}" data-density="large" title="Ukuran Besar (Detail)">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="8" rx="1.5"/><rect x="3" y="13" width="18" height="8" rx="1.5"/></svg>
+                  <span>Besar</span>
+                </button>
+              </div>
+              <div style="font-size: 12px; font-weight: 500; color: var(--foreground); white-space: nowrap;">
+                Dipilih: <span id="efha-counter-badge" style="color: #2ed573; font-weight: 700;">${selectedCount}</span> / ${totalCount}
+              </div>
             </div>
           </div>
 
-          <div class="efha-media-grid" id="efha-media-items-grid">
+          <div class="efha-media-grid density-${currentDensity}" id="efha-media-items-grid">
             ${items.map((item, idx) => {
-              const isVideo = item.media_type === 2 || item.is_video;
-              const isDownloaded = item.pk && downloadHistory[item.pk];
+              const meta = resolvedItems[idx];
+              const isDownloaded = meta.pk && downloadHistory[meta.pk];
               const isSelected = selectedIndices.has(idx);
-              const isHidden = (currentFilter === 'photo' && isVideo) || (currentFilter === 'video' && !isVideo);
-              
-              // Find thumbnail URL
-              let thumbUrl = '';
-              if (item.image_versions2 && item.image_versions2.candidates && item.image_versions2.candidates.length > 0) {
-                const candidates = item.image_versions2.candidates;
-                const sorted = [...candidates].sort((a, b) => a.width - b.width);
-                const suitable = sorted.find(c => c.width >= 240) || sorted[sorted.length - 1];
-                thumbUrl = suitable.url;
-              } else {
-                thumbUrl = getHighestResolutionUrl(item) || '';
-              }
-
-              // Format date/time
-              let timeText = '';
-              if (item.taken_at) {
-                const date = new Date(item.taken_at * 1000);
-                const hours = String(date.getHours()).padStart(2, '0');
-                const mins = String(date.getMinutes()).padStart(2, '0');
-                timeText = `${hours}:${mins}`;
-              }
+              const isHidden = (currentFilter === 'photo' && meta.isVideo) || (currentFilter === 'video' && !meta.isVideo);
 
               return `
                 <div class="efha-media-card ${isSelected ? 'selected' : ''}" data-idx="${idx}" style="${isHidden ? 'display: none;' : ''}">
+                  <div class="efha-media-card-media-wrap">
+                    ${meta.thumbUrl ? `<div class="efha-media-card-blur-bg" style="background-image: url('${meta.thumbUrl}');"></div>` : ''}
+                    <img src="${meta.thumbUrl || meta.fullUrl}" alt="${itemLabel} #${idx + 1}" loading="lazy" />
+                  </div>
+
                   <div class="efha-media-card-type-badge">
-                    ${isVideo 
-                      ? '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> <span>Video</span>' 
-                      : '<svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg> <span>Foto</span>'
+                    ${meta.isVideo 
+                      ? `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> <span>${meta.durationText || 'Video'}</span>` 
+                      : `<svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg> <span>Foto</span>`
                     }
                   </div>
-                  <div class="efha-media-card-check">
+
+                  <div class="efha-media-card-check" title="${isSelected ? 'Batalkan pilihan' : 'Pilih file ini'}">
                     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
-                  <img src="${thumbUrl}" alt="Story #${idx + 1}" loading="lazy" />
+
+                  ${meta.isVideo ? `
+                    <div class="efha-media-card-play-indicator" title="Video">
+                      <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                  ` : ''}
+
+                  <button class="efha-media-card-preview-btn" data-preview-idx="${idx}" title="Lihat Penuh (Full Preview & Putar)">
+                    <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  </button>
+
                   ${isDownloaded ? '<div class="efha-media-card-downloaded-badge">Tersimpan</div>' : ''}
+
                   <div class="efha-media-card-info">
                     <span style="font-weight: 600;">#${idx + 1}</span>
-                    <span>${timeText}</span>
+                    <span>${meta.timeText}</span>
                   </div>
                 </div>
               `;
             }).join('')}
           </div>
 
+          <button id="efha-media-scroll-top-btn" class="efha-media-scroll-top-btn" title="Kembali ke Atas">
+            <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          </button>
+
           <div class="efha-media-modal-footer">
             <div class="efha-media-modal-status-text">
-              Hanya media yang dicentang yang akan disimpan ke komputer.
+              Hanya media yang dicentang yang akan disimpan. Klik ikon mata untuk pratinjau penuh.
             </div>
             <div class="efha-media-modal-footer-actions">
               <button id="efha-media-btn-cancel" class="efha-media-btn-cancel">Batal</button>
@@ -2720,6 +2981,189 @@
       }
     }
 
+    // Open Full-screen Lightbox Preview
+    function openLightbox(idx) {
+      currentLightboxIdx = idx;
+      renderLightbox(idx);
+      lightboxOverlay.classList.add('show');
+
+      // Bind keyboard navigation
+      if (lightboxKeyHandler) {
+        window.removeEventListener('keydown', lightboxKeyHandler);
+      }
+      lightboxKeyHandler = (e) => {
+        if (!lightboxOverlay.classList.contains('show')) return;
+        if (e.key === 'Escape') {
+          closeLightbox();
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          navigateLightbox(-1);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          navigateLightbox(1);
+        } else if (e.code === 'Space') {
+          // If focus is not on a native video element
+          if (document.activeElement && document.activeElement.tagName === 'VIDEO') return;
+          e.preventDefault();
+          toggleSelectLightbox(currentLightboxIdx);
+        }
+      };
+      window.addEventListener('keydown', lightboxKeyHandler);
+    }
+
+    function closeLightbox() {
+      // Pause any video
+      const vid = lightboxOverlay.querySelector('video');
+      if (vid) vid.pause();
+      lightboxOverlay.classList.remove('show');
+      if (lightboxKeyHandler) {
+        window.removeEventListener('keydown', lightboxKeyHandler);
+        lightboxKeyHandler = null;
+      }
+    }
+
+    function navigateLightbox(dir) {
+      let nextIdx = currentLightboxIdx + dir;
+      if (nextIdx < 0) nextIdx = items.length - 1;
+      if (nextIdx >= items.length) nextIdx = 0;
+      renderLightbox(nextIdx);
+    }
+
+    function toggleSelectLightbox(idx) {
+      if (selectedIndices.has(idx)) {
+        selectedIndices.delete(idx);
+      } else {
+        selectedIndices.add(idx);
+      }
+      updateCardState(idx);
+      updateLightboxSelectButton(idx);
+    }
+
+    function updateLightboxSelectButton(idx) {
+      const selectBtn = document.getElementById('efha-lightbox-select');
+      if (!selectBtn) return;
+      const isSelected = selectedIndices.has(idx);
+      selectBtn.className = `efha-lightbox-select-btn ${isSelected ? '' : 'deselected'}`;
+      selectBtn.innerHTML = isSelected 
+        ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <span>Terpilih</span>'
+        : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> <span>Pilih File Ini</span>';
+    }
+
+    function renderLightbox(idx) {
+      currentLightboxIdx = idx;
+      const item = items[idx];
+      const meta = resolvedItems[idx];
+      const isSelected = selectedIndices.has(idx);
+
+      lightboxOverlay.innerHTML = `
+        <div class="efha-lightbox-header">
+          <div class="efha-lightbox-header-left">
+            <button id="efha-lightbox-back" class="efha-lightbox-back-btn">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Kembali</span>
+            </button>
+            <div class="efha-lightbox-title">
+              ${itemLabel} #${idx + 1} dari ${items.length} &bull; @${username}
+            </div>
+          </div>
+
+          <div class="efha-lightbox-header-right">
+            <button id="efha-lightbox-select" class="efha-lightbox-select-btn ${isSelected ? '' : 'deselected'}">
+              ${isSelected 
+                ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> <span>Terpilih</span>'
+                : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> <span>Pilih File Ini</span>'
+              }
+            </button>
+            <button id="efha-lightbox-download-single" class="efha-lightbox-dl-btn" title="Unduh file ini sekarang">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+              <span>Unduh File Ini</span>
+            </button>
+            <button id="efha-lightbox-close" class="efha-lightbox-close-btn" title="Tutup (Esc)">&times;</button>
+          </div>
+        </div>
+
+        <div class="efha-lightbox-body">
+          ${items.length > 1 ? `
+            <button id="efha-lightbox-prev" class="efha-lightbox-nav-btn prev" title="Sebelumnya (Panah Kiri)">
+              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <button id="efha-lightbox-next" class="efha-lightbox-nav-btn next" title="Selanjutnya (Panah Kanan)">
+              <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          ` : ''}
+
+          <div class="efha-lightbox-media-container">
+            ${meta.isVideo
+              ? `<video class="efha-lightbox-video" src="${meta.fullUrl}" controls autoplay playsinline loop></video>`
+              : `<img class="efha-lightbox-img" src="${meta.fullUrl || meta.thumbUrl}" alt="${itemLabel} #${idx + 1}" />`
+            }
+          </div>
+        </div>
+
+        <div class="efha-lightbox-footer">
+          <div class="efha-lightbox-shortcuts">
+            <span><kbd>&larr;</kbd> <kbd>&rarr;</kbd> Ganti Media</span>
+            <span><kbd>Spasi</kbd> Pilih/Batal</span>
+            <span><kbd>Esc</kbd> Tutup</span>
+          </div>
+          <div>
+            ${meta.isVideo ? `Video ${meta.durationText ? `(${meta.durationText})` : ''}` : 'Foto'} ${meta.timeText ? `&bull; ${meta.timeText}` : ''}
+          </div>
+        </div>
+      `;
+
+      // Event listeners in Lightbox
+      document.getElementById('efha-lightbox-close').onclick = closeLightbox;
+      document.getElementById('efha-lightbox-back').onclick = closeLightbox;
+      
+      const prevBtn = document.getElementById('efha-lightbox-prev');
+      if (prevBtn) prevBtn.onclick = () => navigateLightbox(-1);
+
+      const nextBtn = document.getElementById('efha-lightbox-next');
+      if (nextBtn) nextBtn.onclick = () => navigateLightbox(1);
+
+      const selectBtn = document.getElementById('efha-lightbox-select');
+      if (selectBtn) {
+        selectBtn.onclick = () => toggleSelectLightbox(idx);
+      }
+
+      const singleDlBtn = document.getElementById('efha-lightbox-download-single');
+      if (singleDlBtn) {
+        singleDlBtn.onclick = () => {
+          const timestamp = item.taken_at || item.taken_at_timestamp || Math.floor(Date.now() / 1000);
+          const date = new Date(timestamp * 1000);
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          const hours = String(date.getHours()).padStart(2, '0');
+          const mins = String(date.getMinutes()).padStart(2, '0');
+          const secs = String(date.getSeconds()).padStart(2, '0');
+          const dateStr = `${day} ${month} ${year}`;
+          const timeStr = `${hours} ${mins} ${secs}`;
+          const ext = meta.isVideo ? 'mp4' : 'jpg';
+          const filename = `${username}_${dateStr}_${timeStr}_${itemLabel.toLowerCase()}${idx + 1}.${ext}`;
+
+          showToast(`Mengunduh ${filename}...`, 'info');
+          executeDownload(meta.fullUrl, filename, (res) => {
+            if (res && res.success) {
+              showToast('Download dimulai!', 'success');
+              if (meta.pk) markMediaAsDownloaded(meta.pk);
+            } else {
+              showToast('Download gagal: ' + (res ? res.error : 'Unknown error'), 'error');
+            }
+          }, username);
+        };
+      }
+
+      // Close when clicking directly on body outside media
+      const bodyEl = lightboxOverlay.querySelector('.efha-lightbox-body');
+      if (bodyEl) {
+        bodyEl.onclick = (e) => {
+          if (e.target === bodyEl) closeLightbox();
+        };
+      }
+    }
+
     function attachEventListeners() {
       // Close button
       const closeBtn = document.getElementById('efha-media-modal-close');
@@ -2740,11 +3184,49 @@
         }
       };
 
-      // Card click handlers
+      // Grid scrolling & Scroll to Top button
+      const grid = overlay.querySelector('#efha-media-items-grid');
+      const scrollTopBtn = overlay.querySelector('#efha-media-scroll-top-btn');
+      if (grid && scrollTopBtn) {
+        grid.addEventListener('scroll', () => {
+          if (grid.scrollTop > 180) {
+            scrollTopBtn.classList.add('visible');
+          } else {
+            scrollTopBtn.classList.remove('visible');
+          }
+        });
+
+        scrollTopBtn.onclick = () => {
+          grid.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+      }
+
+      // Density selector buttons
+      const densityBtns = overlay.querySelectorAll('.efha-density-btn');
+      densityBtns.forEach(btn => {
+        btn.onclick = () => {
+          const density = btn.getAttribute('data-density');
+          currentDensity = density;
+          densityBtns.forEach(b => b.classList.toggle('active', b === btn));
+          if (grid) {
+            grid.classList.remove('density-compact', 'density-normal', 'density-large');
+            grid.classList.add(`density-${density}`);
+          }
+          chrome.storage.local.set({ efha_media_grid_density: density });
+        };
+      });
+
+      // Card click handlers & preview
       const cards = overlay.querySelectorAll('.efha-media-card');
       cards.forEach(card => {
-        card.onclick = () => {
-          const idx = parseInt(card.getAttribute('data-idx'), 10);
+        const idx = parseInt(card.getAttribute('data-idx'), 10);
+        const meta = resolvedItems[idx];
+
+        // Toggle selection on click
+        card.onclick = (e) => {
+          if (e.target.closest('.efha-media-card-preview-btn')) {
+            return; // Handled separately
+          }
           if (selectedIndices.has(idx)) {
             selectedIndices.delete(idx);
           } else {
@@ -2752,15 +3234,60 @@
           }
           updateCardState(idx);
         };
+
+        // Double click to open full preview
+        card.ondblclick = (e) => {
+          e.preventDefault();
+          openLightbox(idx);
+        };
+
+        // Eye / Preview button click
+        const previewBtn = card.querySelector('.efha-media-card-preview-btn');
+        if (previewBtn) {
+          previewBtn.onclick = (e) => {
+            e.stopPropagation();
+            openLightbox(idx);
+          };
+        }
+
+        // Hover video preview
+        if (meta.isVideo && meta.fullUrl) {
+          card.addEventListener('mouseenter', () => {
+            const wrap = card.querySelector('.efha-media-card-media-wrap');
+            if (!wrap) return;
+            let miniVid = wrap.querySelector('.efha-media-card-mini-video');
+            if (!miniVid) {
+              miniVid = document.createElement('video');
+              miniVid.className = 'efha-media-card-mini-video';
+              miniVid.muted = true;
+              miniVid.loop = true;
+              miniVid.playsInline = true;
+              miniVid.src = meta.fullUrl;
+              wrap.appendChild(miniVid);
+            }
+            miniVid.currentTime = 0;
+            miniVid.play().then(() => {
+              card.classList.add('playing-preview');
+            }).catch(() => {});
+          });
+
+          card.addEventListener('mouseleave', () => {
+            card.classList.remove('playing-preview');
+            const miniVid = card.querySelector('.efha-media-card-mini-video');
+            if (miniVid) {
+              miniVid.pause();
+            }
+          });
+        }
       });
 
       // Select All
       const selectAllBtn = document.getElementById('efha-btn-select-all');
       if (selectAllBtn) {
         selectAllBtn.onclick = () => {
-          items.forEach((item, idx) => {
-            const isVideo = item.media_type === 2 || item.is_video;
-            const isVisible = !( (currentFilter === 'photo' && isVideo) || (currentFilter === 'video' && !isVideo) );
+          items.forEach((_, idx) => {
+            const meta = resolvedItems[idx];
+            const isVisible = !( (currentFilter === 'photo' && meta.isVideo) || (currentFilter === 'video' && !meta.isVideo) );
             if (isVisible) {
               selectedIndices.add(idx);
             }
@@ -2773,9 +3300,9 @@
       const deselectAllBtn = document.getElementById('efha-btn-deselect-all');
       if (deselectAllBtn) {
         deselectAllBtn.onclick = () => {
-          items.forEach((item, idx) => {
-            const isVideo = item.media_type === 2 || item.is_video;
-            const isVisible = !( (currentFilter === 'photo' && isVideo) || (currentFilter === 'video' && !isVideo) );
+          items.forEach((_, idx) => {
+            const meta = resolvedItems[idx];
+            const isVisible = !( (currentFilter === 'photo' && meta.isVideo) || (currentFilter === 'video' && !meta.isVideo) );
             if (isVisible) {
               selectedIndices.delete(idx);
             }
@@ -2792,9 +3319,8 @@
           filterBtns.forEach(b => b.classList.toggle('active', b === btn));
           cards.forEach(card => {
             const idx = parseInt(card.getAttribute('data-idx'), 10);
-            const item = items[idx];
-            const isVideo = item.media_type === 2 || item.is_video;
-            const isHidden = (currentFilter === 'photo' && isVideo) || (currentFilter === 'video' && !isVideo);
+            const meta = resolvedItems[idx];
+            const isHidden = (currentFilter === 'photo' && meta.isVideo) || (currentFilter === 'video' && !meta.isVideo);
             card.style.display = isHidden ? 'none' : '';
           });
         };
@@ -3956,14 +4482,14 @@
             <div id="drawer-folder-status-message" class="status-message"></div>
             
             <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
-              <p class="helper-text" style="font-weight: bold; color: var(--foreground); margin-bottom: 6px;">Keamanan Akun (Anti-Block):</p>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer; color: var(--foreground);">
-                <input type="checkbox" id="drawer-chk-enable-mutual-badges" style="cursor: pointer;" />
+              <p class="helper-text" style="font-weight: bold; color: var(--foreground); margin-bottom: 8px; font-size: 12px;">Keamanan Akun (Anti-Block):</p>
+              <label class="toggle-row" for="drawer-chk-enable-mutual-badges">
                 <span>Aktifkan Badge Hubungan Mutual</span>
+                <span class="toggle-switch">
+                  <input type="checkbox" id="drawer-chk-enable-mutual-badges" />
+                  <span class="toggle-slider"></span>
+                </span>
               </label>
-              <p class="helper-text" style="margin-top: 4px; font-size: 9.5px; color: var(--muted-foreground); line-height: 1.3;">
-                Nonaktifkan ini jika Anda sering terblokir sementara oleh Instagram untuk membatasi request API latar belakang.
-              </p>
             </div>
           </div>
         </div>
@@ -4068,11 +4594,11 @@
         <!-- TAB 3: REKAP DOWNLOAD -->
         <div id="drawer-tab-recap" class="tab-content">
           <div class="sync-actions" style="margin-bottom: 12px; display: flex; gap: 8px;">
-            <button id="drawer-recap-export-btn" class="btn-primary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+            <button id="drawer-recap-export-btn" class="btn-primary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; font-size: 13px; padding: 6px 8px;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="fill: currentColor; flex-shrink: 0;"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg>
               Export Excel
             </button>
-            <button id="drawer-recap-clear-btn" class="btn-danger" style="flex: 1; cursor: pointer;">
+            <button id="drawer-recap-clear-btn" class="btn-danger" style="flex: 1; cursor: pointer; font-size: 13px; padding: 6px 8px;">
               Hapus Rekap
             </button>
           </div>
@@ -4096,14 +4622,14 @@
           <div style="background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 16px; text-align: center;">
             <div id="drawer-bulk-status-icon" style="font-size: 24px; margin-bottom: 8px;">📦</div>
             <div id="drawer-bulk-status-text" style="font-size: 13px; font-weight: 600; color: var(--foreground); margin-bottom: 4px;">Pindai Halaman...</div>
-            <div id="drawer-bulk-info-text" style="font-size: 11px; color: var(--muted-foreground); margin-bottom: 12px;">Menghitung jumlah postingan di layar...</div>
+            <div id="drawer-bulk-info-text" style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 12px;">Menghitung jumlah postingan di layar...</div>
             
             <div style="display: flex; gap: 8px; justify-content: center;">
-              <button id="drawer-btn-bulk-zip" class="btn-primary" style="flex: 1; height: 36px; padding: 0 12px; font-size: 11px; cursor: pointer;">Simpan sebagai ZIP</button>
-              <button id="drawer-btn-bulk-ind" class="btn-secondary" style="flex: 1; height: 36px; padding: 0 12px; font-size: 11px; cursor: pointer;">Simpan Terpisah</button>
+              <button id="drawer-btn-bulk-zip" class="btn-primary" style="flex: 1; padding: 6px 8px; font-size: 13px; cursor: pointer;">Simpan sebagai ZIP</button>
+              <button id="drawer-btn-bulk-ind" class="btn-secondary" style="flex: 1; padding: 6px 8px; font-size: 13px; cursor: pointer;">Simpan Terpisah</button>
             </div>
           </div>
-          <p class="helper-text" style="line-height: 1.4; color: var(--muted-foreground); font-size: 11.5px; margin: 0;">
+          <p class="helper-text" style="line-height: 1.4; color: var(--muted-foreground); font-size: 12px; margin: 0;">
             <strong>Catatan:</strong> Fitur ini akan mengunduh semua foto/video dari postingan feed atau reels yang sedang tampil di layar Anda saat ini. Gulir halaman ke bawah untuk memuat lebih banyak postingan, lalu klik salah satu tombol di atas.
           </p>
         </div>

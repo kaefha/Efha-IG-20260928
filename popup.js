@@ -784,7 +784,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (entries.length === 0) {
       containerElement.innerHTML = `
-        <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 11px;">
+        <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 12px;">
           Belum ada data unduhan. Silakan unduh foto/video terlebih dahulu.
         </div>
       `;
@@ -792,14 +792,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     containerElement.innerHTML = '';
-    entries.forEach(([username, count]) => {
+    entries.forEach(([username, count], idx) => {
+      const isLast = idx === entries.length - 1;
       const item = document.createElement('div');
       item.className = 'recap-item';
-      item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--secondary); border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); margin-bottom: 6px;';
+      item.style.cssText = `display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: transparent; ${isLast ? '' : 'border-bottom: 1px solid var(--border);'}`;
       
       item.innerHTML = `
-        <span class="recap-username" style="font-weight: 600; color: var(--foreground); font-size: 11px;">@${username}</span>
-        <span class="recap-badge" style="background: var(--card); color: var(--foreground); border: 1px solid var(--border); font-weight: 600; font-size: 10px; padding: 2px 8px; border-radius: 12px;">${count} File</span>
+        <span class="recap-username" style="font-weight: 600; color: var(--foreground); font-size: 12px;">@${username}</span>
+        <span class="recap-badge" style="background: var(--secondary); color: var(--foreground); font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 12px;">${count} File</span>
       `;
       containerElement.appendChild(item);
     });

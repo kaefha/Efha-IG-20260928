@@ -13,6 +13,7 @@
       background-color: var(--background);
       color: var(--foreground);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
       overflow-x: hidden;
     }
 
@@ -33,7 +34,7 @@
     }
 
     .status-title {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--muted-foreground);
       font-weight: 500;
     }
@@ -81,7 +82,7 @@
         </button>
         <div class="status-badge">
           <span id="status-dot" class="status-dot"></span>
-          <span id="status-text" style="font-size: 11px; color: var(--muted-foreground);">Checking...</span>
+          <span id="status-text" style="font-size: 12px; color: var(--muted-foreground);">Checking...</span>
         </div>
       </div>
     </div>
@@ -94,16 +95,14 @@
       </div>
       <div class="panel-body">
         <div id="popup-custom-folder-display" style="display: none; background: var(--secondary); padding: 8px 10px; border-radius: 6px; border: 1px dashed var(--border); margin-bottom: 12px;">
-          <div style="font-size: 10px; color: var(--muted-foreground); font-weight: 700; text-transform: uppercase;">Folder Kustom Aktif</div>
+          <div style="font-size: 12px; color: var(--muted-foreground); font-weight: 700; text-transform: uppercase;">Folder Kustom Aktif</div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
             <span id="popup-custom-folder-name" style="font-size: 12px; color: var(--foreground); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">-</span>
-            <button id="btn-clear-popup-custom-dir" style="background: none; border: none; color: var(--destructive); font-size: 11px; cursor: pointer; padding: 0; font-weight: bold; font-family: inherit;">Hapus</button>
+            <button id="btn-clear-popup-custom-dir" style="background: none; border: none; color: var(--destructive); font-size: 12px; cursor: pointer; padding: 0; font-weight: bold; font-family: inherit;">Hapus</button>
           </div>
         </div>
 
-        <p class="helper-text" style="font-weight: bold; color: var(--foreground); margin-bottom: 6px;">💡 Tips Langsung Download (Bebas Pilih Folder):</p>
-        <p class="helper-text" style="margin-bottom: 12px; line-height: 1.4;">Untuk menyimpan ke folder kustom mana saja di komputer Anda (tanpa tanya lokasi setiap download), silakan gunakan tombol <strong>"Pilih Folder"</strong> di panel melayang Efha pada halaman Instagram.</p>
-        <p class="helper-text" style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">Atau atur nama subfolder (di dalam folder Downloads bawaan Chrome):</p>
+        <p class="helper-text" style="font-size: 12px; margin-bottom: 6px;">Atur nama subfolder (di dalam folder Downloads bawaan Chrome):</p>
         <div class="input-group">
           <input type="text" id="input-folder-path" placeholder="Contoh: Efha_Instagram" />
           <button id="btn-save-folder" class="btn-save">Simpan</button>
@@ -111,14 +110,14 @@
         <div id="folder-status-message" class="status-message"></div>
 
         <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
-          <p class="helper-text" style="font-weight: bold; color: var(--foreground); margin-bottom: 6px;">Keamanan Akun (Anti-Block):</p>
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer; color: var(--foreground);">
-            <input type="checkbox" id="chk-enable-mutual-badges" style="cursor: pointer;" />
+          <p class="helper-text" style="font-weight: bold; color: var(--foreground); margin-bottom: 8px; font-size: 12px;">Keamanan Akun (Anti-Block):</p>
+          <label class="toggle-row" for="chk-enable-mutual-badges">
             <span>Aktifkan Badge Hubungan Mutual</span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="chk-enable-mutual-badges" />
+              <span class="toggle-slider"></span>
+            </span>
           </label>
-          <p class="helper-text" style="margin-top: 4px; font-size: 9.5px; color: var(--muted-foreground); line-height: 1.3;">
-            Nonaktifkan ini jika Anda sering terblokir sementara oleh Instagram untuk membatasi request API latar belakang.
-          </p>
         </div>
       </div>
     </div>
@@ -249,22 +248,22 @@
     <!-- TAB 4: REKAP DOWNLOAD -->
     <div id="tab-recap" class="tab-content">
       <div class="sync-actions" style="margin-bottom: 12px; display: flex; gap: 8px;">
-        <button id="popup-recap-export-btn" class="btn-primary" style="flex: 1; font-size: 11px; padding: 6px 8px;">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="fill: currentColor; flex-shrink: 0;"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg>
+        <button id="popup-recap-export-btn" class="btn-primary" style="flex: 1; font-size: 13px; padding: 6px 8px;">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="fill: currentColor; flex-shrink: 0;"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg>
           Export Excel
         </button>
-        <button id="popup-recap-clear-btn" class="btn-danger" style="flex: 1; font-size: 11px; padding: 6px 8px;">
+        <button id="popup-recap-clear-btn" class="btn-danger" style="flex: 1; font-size: 13px; padding: 6px 8px;">
           Hapus Rekap
         </button>
       </div>
 
-      <div style="font-size: 11px; color: var(--muted-foreground); margin-bottom: 10px; line-height: 1.4;">
+      <div style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 10px; line-height: 1.4;">
         Rekap jumlah file media yang berhasil terdownload:
       </div>
 
       <div class="list-wrapper" style="max-height: 250px; overflow-y: auto;">
         <div id="popup-recap-list-container">
-          <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 11px;">
+          <div style="padding: 24px; text-align: center; color: var(--muted-foreground); font-size: 12px;">
             Belum ada data unduhan.
           </div>
         </div>
