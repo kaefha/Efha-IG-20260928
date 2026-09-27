@@ -1,6 +1,0 @@
-User-Agent: *
-Allow: /
-Disallow: /private/
-Disallow: /*?*
-
-Sitemap: https://shadcnstudio.com/sitemap.xml

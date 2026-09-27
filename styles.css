@@ -424,16 +424,16 @@ input[type="text"],
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   z-index: 100000001;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: none !important;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   box-sizing: border-box;
 }
@@ -452,9 +452,9 @@ input[type="text"],
   max-height: 880px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  transform: scale(0.96) translateY(8px);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: none !important;
   color: var(--foreground);
   overflow: hidden;
   box-sizing: border-box;
@@ -462,7 +462,7 @@ input[type="text"],
 }
 
 .efha-media-modal-overlay.show .efha-media-modal {
-  transform: scale(1) translateY(0);
+  transform: none !important;
 }
 
 .efha-media-modal-header {
@@ -629,33 +629,54 @@ input[type="text"],
 
 /* Media Grid Container with modern smooth scrollbar and overscroll containment */
 .efha-media-grid {
-  padding: 20px 24px 50px 24px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  padding: 20px 24px 80px 24px;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior-y: contain;
   scroll-behavior: smooth;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
-  gap: 14px;
-  flex: 1;
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  grid-auto-flow: row !important;
+  grid-auto-rows: max-content !important;
+  row-gap: 24px !important;
+  column-gap: 12px !important;
+  gap: 24px 12px !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none !important;
   position: relative;
+  box-sizing: border-box;
 }
 
 /* Density Variants */
 .efha-media-grid.density-compact {
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 10px;
-  padding: 14px 18px 50px 18px;
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  grid-auto-flow: row !important;
+  grid-auto-rows: max-content !important;
+  row-gap: 20px !important;
+  column-gap: 10px !important;
+  gap: 20px 10px !important;
+  padding: 16px 18px 80px 18px;
 }
 
 .efha-media-grid.density-normal {
-  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  grid-auto-flow: row !important;
+  grid-auto-rows: max-content !important;
+  row-gap: 24px !important;
+  column-gap: 12px !important;
+  gap: 24px 12px !important;
+  padding: 20px 24px 80px 24px;
 }
 
 .efha-media-grid.density-large {
-  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
-  gap: 18px;
-  padding: 24px 28px 50px 28px;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  grid-auto-flow: row !important;
+  grid-auto-rows: max-content !important;
+  row-gap: 28px !important;
+  column-gap: 16px !important;
+  gap: 28px 16px !important;
+  padding: 24px 28px 80px 28px;
 }
 
 /* Sleek modern scrollbar */
@@ -730,7 +751,7 @@ input[type="text"],
   stroke-linejoin: round;
 }
 
-/* Media Card (Full preview, no cropping) */
+/* Media Card (Full preview, no cropping - Zero Effects for Max Performance) */
 .efha-media-card {
   position: relative;
   aspect-ratio: 9 / 16;
@@ -739,26 +760,31 @@ input[type="text"],
   cursor: pointer;
   border: 2px solid var(--border);
   background: #09090b;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: none !important;
+  transition: none !important;
+  transform: none !important;
   user-select: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  width: 100% !important;
 }
 
 .efha-media-card:hover {
-  transform: translateY(-3px);
+  transform: none !important;
   border-color: var(--ring);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  box-shadow: none !important;
 }
 
 .efha-media-card.selected {
-  border-color: #2ed573;
-  box-shadow: 0 0 0 2px rgba(46, 213, 115, 0.4), 0 6px 18px rgba(46, 213, 115, 0.2);
+  border-color: #2ed573 !important;
+  box-shadow: none !important;
 }
 
-/* Media preview wrapper with subtle ambient backdrop blur so full media fits without bars feeling empty */
+/* Media preview wrapper */
 .efha-media-card-media-wrap {
   position: absolute;
   inset: 0;
@@ -771,19 +797,12 @@ input[type="text"],
   background: #000;
 }
 
+/* Blur background disabled completely to prevent GPU lag */
 .efha-media-card-blur-bg {
-  position: absolute;
-  inset: -15px;
-  background-size: cover;
-  background-position: center;
-  filter: blur(14px) brightness(0.35);
-  transform: scale(1.15);
-  opacity: 0.75;
-  pointer-events: none;
-  z-index: 0;
+  display: none !important;
 }
 
-/* The actual image or video element displayed FULL (contain) */
+/* The actual image or video element displayed FULL (contain) - No scaling on hover */
 .efha-media-card-media-wrap img,
 .efha-media-card-media-wrap video {
   position: relative;
@@ -792,12 +811,13 @@ input[type="text"],
   height: 100%;
   object-fit: contain;
   display: block;
-  transition: transform 0.25s ease;
+  transition: none !important;
+  transform: none !important;
 }
 
 .efha-media-card:hover .efha-media-card-media-wrap img,
 .efha-media-card:hover .efha-media-card-media-wrap video {
-  transform: scale(1.02);
+  transform: none !important;
 }
 
 /* Mini hover video player */
@@ -816,7 +836,7 @@ input[type="text"],
   display: block;
 }
 
-/* Card Badges */
+/* Card Badges - No backdrop-filter blur */
 .efha-media-card-type-badge {
   position: absolute;
   top: 8px;
@@ -825,10 +845,10 @@ input[type="text"],
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.85) !important;
   color: #fff;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -849,13 +869,13 @@ input[type="text"],
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.7);
   border: 2px solid rgba(255, 255, 255, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 4;
-  transition: all 0.2s ease;
+  transition: none !important;
 }
 
 .efha-media-card.selected .efha-media-card-check {
@@ -878,7 +898,7 @@ input[type="text"],
   display: block;
 }
 
-/* Preview Full button on card hover (eye icon) */
+/* Preview Full button on card hover (eye icon) - No scale/shadow animations */
 .efha-media-card-preview-btn {
   position: absolute;
   bottom: 8px;
@@ -886,30 +906,31 @@ input[type="text"],
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.85);
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 4;
   opacity: 0;
-  transform: scale(0.85);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: none !important;
+  transition: none !important;
+  box-shadow: none !important;
 }
 
 .efha-media-card:hover .efha-media-card-preview-btn {
   opacity: 1;
-  transform: scale(1);
+  transform: none !important;
 }
 
 .efha-media-card-preview-btn:hover {
   background: var(--primary);
   color: var(--primary-foreground);
   border-color: var(--primary);
-  transform: scale(1.12);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .efha-media-card-preview-btn svg {
@@ -927,8 +948,8 @@ input[type="text"],
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 22px 10px 8px 10px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, transparent 100%);
+  padding: 16px 10px 8px 10px;
+  background: rgba(0, 0, 0, 0.85);
   color: #fff;
   font-size: 12px;
   display: flex;
@@ -946,24 +967,26 @@ input[type="text"],
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
-  background: rgba(59, 130, 246, 0.9);
+  background: #2563eb !important;
   color: #fff;
-  backdrop-filter: blur(4px);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   z-index: 4;
 }
 
-/* Video play indicator icon on cards */
+/* Video play indicator icon on cards - No blur or scaling */
 .efha-media-card-play-indicator {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.9);
+  transform: translate(-50%, -50%) !important;
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -971,13 +994,13 @@ input[type="text"],
   z-index: 3;
   opacity: 0.85;
   pointer-events: none;
-  transition: all 0.2s ease;
+  transition: none !important;
 }
 
 .efha-media-card:hover .efha-media-card-play-indicator {
-  transform: translate(-50%, -50%) scale(1.08);
+  transform: translate(-50%, -50%) !important;
   opacity: 1;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.9);
 }
 
 .efha-media-card-play-indicator svg {
